@@ -67,6 +67,8 @@ void attachCommandCallbacks()
 	cmdMessenger.attach(kStatus, OnStatus); //4
 }
 
+
+
 // Called when a received command has no attached function
 void OnUnknownCommand()
 {
@@ -74,16 +76,14 @@ void OnUnknownCommand()
 	ShowCommands();
 }
 
+//by defaults, when picking a pin, it sets the pin as input
+//and reads its state
 void OnSetPin()
 {
 	kpin = cmdMessenger.readInt16Arg();
-
 	pinMode(kpin, INPUT);
-
 	pinState = digitalRead(kpin);
-
 	pinBrightness = analogRead(kpin);
-
 	ShowPinState();
 }
 // Callback function that shows a list of commands
@@ -92,20 +92,12 @@ void OnCommandList()
 	ShowCommands();
 }
 
-// Callback function that sets led on or off
+// Callback function that sets pin on or off
 void OnSetState()
 {
 	// Read led state argument, expects 0 or 1 and interprets as false or true 
 	pinState = cmdMessenger.readBoolArg();
 
-	SetPinValue();
-
-	ShowPinState();
-}
-
-
-void SetPinValue()
-{
 	pinMode(kpin, OUTPUT);
 	if (pinState) {
 		// If led is turned on, go to correct brightness using analog write
@@ -115,7 +107,12 @@ void SetPinValue()
 		// If led is turned off, use digital write to disable PWM
 		digitalWrite(kpin, LOW);
 	}
+
+	ShowPinState();
 }
+
+
+
 // Callback function that sets led on or off
 void OnSetLedBrightness()
 {
@@ -130,9 +127,9 @@ void OnSetLedBrightness()
 	// clamp value intervalOn on 0 and PWMinterval
 	intervalOn = max(min(pinBrightness, PWMinterval), 0);
 
-	//SetPinValue();
-	// Show Led state
+	
 	ShowPinState();
+
 }
 
 // Callback function that shows led status
@@ -141,6 +138,15 @@ void OnStatus()
 	// Send back status that describes the led state
 	ShowPinState();
 }
+
+
+//////////////////////////////////////////////////////
+////////////////////////////////////////////////////
+///////////////////////////////////////////////
+///////////////////////////////////////////////////
+
+
+
 
 // Show available commands
 void ShowCommands()
