@@ -37,9 +37,9 @@ unsigned long prevBlinkTime = 0;
 const unsigned long PWMinterval = 1000;
 
 // Blinking led variables 
-bool ledState = 1;                 // On/Off state of Led
-int  ledBrightness = prevBlinkTime / 2; // 50 % Brightness 
-const int kBlinkLed = 13;                // Pin of internal Led
+bool pinState = 1;                 // On/Off state of Led
+int  pinBrightness = prevBlinkTime / 2; // 50 % Brightness 
+ int kpin = 3;                // Pin of internal Led
 
 										 // Attach a new CmdMessenger object to the default Serial port
 CmdMessenger cmdMessenger = CmdMessenger(Serial);
@@ -49,8 +49,9 @@ CmdMessenger cmdMessenger = CmdMessenger(Serial);
 enum
 {
 	kCommandList, // Command to request list of available commands
-	kSetLed, // Command to request led to be set in specific state  
-	kSetLedBrightness, // Command to request led to be set in to specific brightness  
+	kSetPin, // Command to select a pin Number  
+	kSetState, // Command to request led to be set in specific state  
+	kSetPinBrightness, // Command to request led to be set in to specific brightness  
 	kStatus, // Command to request led status
 };
 
@@ -59,10 +60,11 @@ void attachCommandCallbacks()
 {
 	// Attach callback methods
 	cmdMessenger.attach(OnUnknownCommand);
-	cmdMessenger.attach(kCommandList, OnCommandList);
-	cmdMessenger.attach(kSetLed, OnSetLed);
-	cmdMessenger.attach(kSetLedBrightness, OnSetLedBrightness);
-	cmdMessenger.attach(kStatus, OnStatus);
+	cmdMessenger.attach(kCommandList, OnCommandList); //0
+	cmdMessenger.attach(kSetPin, OnSetPin); // 1
+	cmdMessenger.attach(kSetState, OnSetState); //2
+	cmdMessenger.attach(kSetPinBrightness, OnSetLedBrightness); //3
+	cmdMessenger.attach(kStatus, OnStatus); //4
 }
 
 // Called when a received command has no attached function
@@ -72,6 +74,18 @@ void OnUnknownCommand()
 	ShowCommands();
 }
 
+void OnSetPin()
+{
+	kpin = cmdMessenger.readInt16Arg();
+
+	pinMode(kpin, INPUT);
+
+	pinState = digitalRead(kpin);
+
+	pinBrightness = analogRead(kpin);
+
+	ShowPinState();
+}
 // Callback function that shows a list of commands
 void OnCommandList()
 {
@@ -79,29 +93,53 @@ void OnCommandList()
 }
 
 // Callback function that sets led on or off
-void OnSetLed()
+void OnSetState()
 {
 	// Read led state argument, expects 0 or 1 and interprets as false or true 
-	ledState = cmdMessenger.readBoolArg();
-	ShowLedState();
+	pinState = cmdMessenger.readBoolArg();
+
+	SetPinValue();
+
+	ShowPinState();
 }
 
+
+void SetPinValue()
+{
+	pinMode(kpin, OUTPUT);
+	if (pinState) {
+		// If led is turned on, go to correct brightness using analog write
+		digitalWrite(kpin, HIGH);
+	}
+	else {
+		// If led is turned off, use digital write to disable PWM
+		digitalWrite(kpin, LOW);
+	}
+}
 // Callback function that sets led on or off
 void OnSetLedBrightness()
 {
 	// Read led brightness argument, expects value between 0 to 255
-	ledBrightness = cmdMessenger.readInt16Arg();
+	pinBrightness = cmdMessenger.readInt16Arg();
+
+	pinMode(kpin, OUTPUT);
+
+	analogWrite(kpin, pinBrightness);
+
 	// Set led brightness
-	SetBrightness();
+	// clamp value intervalOn on 0 and PWMinterval
+	intervalOn = max(min(pinBrightness, PWMinterval), 0);
+
+	//SetPinValue();
 	// Show Led state
-	ShowLedState();
+	ShowPinState();
 }
 
 // Callback function that shows led status
 void OnStatus()
 {
 	// Send back status that describes the led state
-	ShowLedState();
+	ShowPinState();
 }
 
 // Show available commands
@@ -109,40 +147,29 @@ void ShowCommands()
 {
 	Serial.println("Available commands");
 	Serial.println(" 0;                 - This command list");
-	Serial.println(" 1,<led state>;     - Set led. 0 = off, 1 = on");
-	Serial.print(" 2,<led brightness>; - Set led brighness. 0 - ");
+	Serial.println(" 1,<pin number>;     - Set pin number");
+	Serial.println(" 2,<pin state>;     - Set pin value --> 0 = off, 1 = on");
+	Serial.print(" 3,<pin brightness>; - Set pin brighness --> 0 - ");
 	Serial.println(PWMinterval);
-	Serial.println(" 3;                  - Show led state");
+	Serial.println(" 4;                  - Show pin state");
 }
+
 
 // Show led state
-void ShowLedState()
+void ShowPinState()
 {
-	Serial.print("Led status: ");
-	Serial.println(ledState ? "on" : "off");
-	Serial.print("Led brightness: ");
-	Serial.println(ledBrightness);
+	Serial.print("Pin number:\t");
+	Serial.println(kpin);
+	
+	Serial.print("Pin status:\t");
+	Serial.println(pinState ? "on" : "off");
+	Serial.print("Pin brightness:\t");
+	Serial.println(pinBrightness);
 }
 
-// Set led state
-void SetLedState()
-{
-	if (ledState) {
-		// If led is turned on, go to correct brightness using analog write
-		analogWrite(kBlinkLed, ledBrightness);
-	}
-	else {
-		// If led is turned off, use digital write to disable PWM
-		digitalWrite(kBlinkLed, LOW);
-	}
-}
 
-// Set led brightness
-void SetBrightness()
-{
-	// clamp value intervalOn on 0 and PWMinterval
-	intervalOn = max(min(ledBrightness, PWMinterval), 0);
-}
+
+
 
 // Pulse Width Modulation to vary Led intensity
 // turn on until intervalOn, then turn off until PWMinterval
@@ -150,11 +177,11 @@ bool blinkLed() {
 	if (micros() - prevBlinkTime > PWMinterval) {
 		// Turn led on at end of interval (if led state is on)
 		prevBlinkTime = micros();
-		digitalWrite(kBlinkLed, ledState ? HIGH : LOW);
+		digitalWrite(kpin, pinState ? HIGH : LOW);
 	}
 	else if (micros() - prevBlinkTime > intervalOn) {
 		// Turn led off at  halfway interval    
-		digitalWrite(kBlinkLed, LOW);
+		digitalWrite(kpin, LOW);
 	}
 }
 
@@ -171,7 +198,7 @@ void setup()
 	attachCommandCallbacks();
 
 	// set pin for blink LED
-	pinMode(kBlinkLed, OUTPUT);
+	//pinMode(kpin, OUTPUT);
 
 	// Show command list
 	ShowCommands();
@@ -182,5 +209,7 @@ void loop()
 {
 	// Process incoming serial data, and perform callbacks
 	cmdMessenger.feedinSerialData();
-	blinkLed();
+
+
+	//blinkLed();
 }
