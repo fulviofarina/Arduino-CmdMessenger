@@ -36,6 +36,8 @@ unsigned long intervalOn = 0;
 unsigned long prevBlinkTime = 0;
 const unsigned long PWMinterval = 1000;
 
+
+
 // Blinking led variables 
 bool pinState = 1;                 // On/Off state of Led
 int  pinBrightness = prevBlinkTime / 2; // 50 % Brightness 
@@ -53,6 +55,7 @@ enum
 	kSetState, // Command to request led to be set in specific state  
 	kSetPinBrightness, // Command to request led to be set in to specific brightness  
 	kStatus, // Command to request led status
+	kReset
 };
 
 // Callbacks define on which received commands we take action
@@ -65,6 +68,7 @@ void attachCommandCallbacks()
 	cmdMessenger.attach(kSetState, OnSetState); //2
 	cmdMessenger.attach(kSetPinBrightness, OnSetLedBrightness); //3
 	cmdMessenger.attach(kStatus, OnStatus); //4
+	cmdMessenger.attach(kReset, OnReset); //4
 }
 
 
@@ -74,6 +78,9 @@ void OnUnknownCommand()
 {
 	Serial.println("This command is unknown!");
 	ShowCommands();
+
+	
+	
 }
 
 //by defaults, when picking a pin, it sets the pin as input
@@ -111,7 +118,13 @@ void OnSetState()
 	ShowPinState();
 }
 
+void(*pseudoReset)(void) = 0;
 
+void OnReset()
+{
+	pseudoReset();
+
+}
 
 // Callback function that sets led on or off
 void OnSetLedBrightness()
@@ -158,6 +171,7 @@ void ShowCommands()
 	Serial.print(" 3,<pin brightness>; - Set pin brighness --> 0 - ");
 	Serial.println(PWMinterval);
 	Serial.println(" 4;                  - Show pin state");
+	Serial.println(" 5;                  - Reset Arduino");
 }
 
 
